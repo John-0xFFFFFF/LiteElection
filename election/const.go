@@ -2,4 +2,4 @@ package election
 
 import "time"
 
-const DefaultTermExpireTime = 30 * time.Second
+const DefaultTermExpireTime = 6 * time.Second
