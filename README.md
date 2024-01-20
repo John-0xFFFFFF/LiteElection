@@ -32,11 +32,17 @@ func main(){
     InitRedis(YourExistedRedisClient)
 
     //Next to init Election Algorithm
-    //The key parameter refers to the name you choose for storing election results in Redis. It is recommended to  select a key name that is closely related to the cluster name.
+    //The key parameter refers to the name you choose for storing election results in Redis. 
+    //It is recommended to  select a key name that is closely related to the cluster name.
     key:="election_cluster001"
-    //The value parameter is utilized to identify the current leader of the cluster in Redis. It is recommended to associate this value with the machine/container name where the current process is running.
+    //The value parameter is utilized to identify the current leader of the cluster in Redis. 
+    //It is recommended to associate this value with the machine/container name where the current process is running.
     value:="machine_001"
-    e:=NewSimpleElection(key,value,10*time.Second)
+    //Then set you leader's term duration.
+    //If you also want set election interval and keep-alive interval,
+    //you should use function NewElection()
+    termDuration:=10*time.Second
+    e:=NewSimpleElection(key,value,termDuration)
     e.Start()
 
     //If you want to check whether you are the leader
