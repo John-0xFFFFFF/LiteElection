@@ -93,7 +93,7 @@ func (e *Election) KeepAlive() error {
 }
 
 func (e *Election) Elect() (bool, error) {
-	rawValue, err := setNxExScript.Run(context.Background(), RedisClient, []string{e.Key}, e.Value, e.TermDuration).Result()
+	rawValue, err := setNxExScript.Run(context.Background(), RedisClient, []string{e.Key}, e.Value, e.TermDuration/time.Second).Result()
 	if err != nil {
 		return false, err
 	}

@@ -23,7 +23,7 @@ By default, the election interval is set to **1/3** of the term duration, and th
 ## Usage
 
 ```go
-import github.com/John-0xFFFFFF/LiteElection
+import "github.com/John-0xFFFFFF/LiteElection"
 
 func main(){
     //First of all you need to init your redis
