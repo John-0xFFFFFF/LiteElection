@@ -3,11 +3,10 @@ package election
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync/atomic"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type Election struct {
@@ -67,37 +66,35 @@ func (e *Election) IsLeader() bool {
 	return atomic.LoadInt32(&e.isLeader) == 1
 }
 
-// todo change with lua script
 func (e *Election) KeepAlive() error {
 	ctx := context.Background()
-	tfx := func(tx *redis.Tx) error {
-		curValue, err := tx.Get(ctx, e.Key).Result()
-		if err != nil {
-			return err
-		}
-		//todo with redis.nil
-		isLeader, err := e.Verify(e.Value, curValue)
-		if err != nil {
-			return err
-		}
-		if !isLeader {
-			return errors.New("only leader allowed to keep alive")
-		}
-		_, err = tx.Pipeline().TxPipelined(ctx, func(p redis.Pipeliner) error {
-			tx.Expire(ctx, e.Key, e.TermDuration)
-			return nil
-		})
+	ret,err:=RedisClient.Eval(ctx,keepAliveScript,[]string{e.Key},e.Value,e.TermDuration/time.Millisecond).Result()
+	if err!=nil{
 		return err
 	}
-	return RedisClient.Watch(ctx, tfx, e.Key)
+	res,ok:=ret.(int64)
+	if !ok{
+		return fmt.Errorf("lua script invalid return type")
+	}
+
+	switch keepAliveResult(res){
+	case keepAliveSucceeded:
+		return nil
+	case keyNotFound:
+		return fmt.Errorf("leader key %s not found,try to elect",e.Key)
+	case leaderChanged:
+		return fmt.Errorf("leader changed")
+	default:
+		return fmt.Errorf("invalid lua return:%d",res)
+	}
 }
 
 func (e *Election) Elect() (bool, error) {
-	rawValue, err := setNxExScript.Run(context.Background(), RedisClient, []string{e.Key}, e.Value, e.TermDuration/time.Second).Result()
+	ret, err := RedisClient.Eval(context.Background(), setNxExScript, []string{e.Key}, e.Value, e.TermDuration/time.Second).Result()
 	if err != nil {
 		return false, err
 	}
-	remoteValue, ok := rawValue.(string)
+	remoteValue, ok := ret.(string)
 	if !ok {
 		return false, errors.New("invalid value to verify")
 	}
@@ -114,15 +111,7 @@ func (e *Election) Elect() (bool, error) {
 	return false, err
 }
 
-var setNxExScript = redis.NewScript(`
-local current_value = redis.call('GET', KEYS[1])
-if current_value then
-	return current_value
-else
-	redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')
-	return "OK"
-end
-`)
+
 
 func (e *Election) Do() {
 
